@@ -8,21 +8,21 @@
 
 import Foundation
 import UIKit
-import Metal
+import MetalKit
 import QuartzCore
 
-@available(iOS 8.0, *)
+@available(iOS 9.0, *)
 
 @objc (Render)
-class Render: NSObject, UIGestureRecognizerDelegate {
+class Render: MTKView, UIGestureRecognizerDelegate {
   
   var view:          UIView!                 = nil
-  var device:        MTLDevice!              = nil
   var metalLayer:    CAMetalLayer!           = nil
   var vertexBuffer:  MTLBuffer!              = nil
   var pipelineState: MTLRenderPipelineState! = nil
   var commandQueue:  MTLCommandQueue!        = nil
   var timer:         CADisplayLink!          = nil
+  var position:      CGPoint!                = nil
   
   let vertexData: [Float] = [
                                0.0,  1.0, 0.0,
@@ -31,72 +31,81 @@ class Render: NSObject, UIGestureRecognizerDelegate {
                             ]
   
   // IMPORTANT!!! when the bridge is loading it needs this method
-  override init() {
-    super.init()
+  
+//  init(view: UIView) {
+//    
+//    self.view = view
+//    self.position = view.layer.position
+//
+//    // Create a CAMetalLayer
+//    self.metalLayer                 = CAMetalLayer()
+//    self.metalLayer.pixelFormat     = .BGRA8Unorm
+//    self.metalLayer.framebufferOnly = true
+//    self.metalLayer.frame           = view.layer.frame
+//    //self.metalLayer.position        = self.position
+//    
+//    self.view.layer.addSublayer(metalLayer)
+//    
+//    // Create a Vertex Buffer
+//    let dataSize      = vertexData.count * sizeofValue(vertexData[0])// 1
+//    self.vertexBuffer = device!.newBufferWithBytes(vertexData,
+//                                                   length: dataSize,
+//                                                   options: .CPUCacheModeDefaultCache)
+//    
+//    
+//    
+//    // Create a Render Pipeline
+//    let defaultLibrary  = device!.newDefaultLibrary()
+//    let fragmentProgram = defaultLibrary!.newFunctionWithName("basic_fragment")
+//    let vertexProgram   = defaultLibrary!.newFunctionWithName("basic_vertex")
+//
+//    let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
+//    
+//    pipelineStateDescriptor.vertexFunction                  = vertexProgram
+//    pipelineStateDescriptor.fragmentFunction                = fragmentProgram
+//    pipelineStateDescriptor.colorAttachments[0].pixelFormat = .BGRA8Unorm
+//    
+//    do {
+//      self.pipelineState = try device!.newRenderPipelineStateWithDescriptor(pipelineStateDescriptor)
+//    } catch let error {
+//      print("error -> ", error)
+//    }
+//    
+//    // Create a Command Queue
+//    self.commandQueue = device!.newCommandQueue()
+//    
+//    
+//    
+//    /**           Rendering a triangle
+//    */
+//    
+//    // Create a Display Link - the timer fires every frame
+//    self.timer = CADisplayLink(target: self, selector: #selector(Render.gameloop))
+//    self.timer.addToRunLoop(NSRunLoop.mainRunLoop(), forMode: NSDefaultRunLoopMode)
+//    
+//    // Add gesture recogniser
+//    let gRec = UIPanGestureRecognizer(target: self, action: #selector(Render.handleOrientation))
+//    gRec.delegate = self
+//    self.view.addGestureRecognizer(gRec)
+//  }
+  
+  override init(frame frameRect: CGRect, device: MTLDevice?) {
+    
+    super.init(frame: frameRect, device: device)
+    
+    self.delegate = self
+    self.frame = frameRect
+    
+    // additional setup?
+    
   }
   
-  init(view: UIView) {
-    super.init()
-    
-    self.view = view
-    
-    // Create a MTLDevice
-    self.device = MTLCreateSystemDefaultDevice()!
-
-    // Create a CAMetalLayer
-    self.metalLayer                 = CAMetalLayer()
-    self.metalLayer.device          = device
-    self.metalLayer.pixelFormat     = .BGRA8Unorm
-    self.metalLayer.framebufferOnly = true
-    self.metalLayer.frame           = view.layer.frame
-    
-    self.view.layer.addSublayer(metalLayer)
-    
-    // Create a Vertex Buffer
-    let dataSize      = vertexData.count * sizeofValue(vertexData[0])// 1
-    self.vertexBuffer = device.newBufferWithBytes(vertexData,
-                                                   length: dataSize,
-                                                   options: .CPUCacheModeDefaultCache)
-    
-    
-    
-    // Create a Render Pipeline
-    let defaultLibrary  = device.newDefaultLibrary()
-    let fragmentProgram = defaultLibrary!.newFunctionWithName("basic_fragment")
-    let vertexProgram   = defaultLibrary!.newFunctionWithName("basic_vertex")
-
-    let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
-    
-    pipelineStateDescriptor.vertexFunction                  = vertexProgram
-    pipelineStateDescriptor.fragmentFunction                = fragmentProgram
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = .BGRA8Unorm
-    
-    do {
-      self.pipelineState = try device.newRenderPipelineStateWithDescriptor(pipelineStateDescriptor)
-    } catch let error {
-      print("error -> ", error)
-    }
-    
-    // Create a Command Queue
-    self.commandQueue = device.newCommandQueue()
-    
-    
-    
-    /**           Rendering a triangle
-    */
-    
-    // Create a Display Link - the timer fires every frame
-    self.timer = CADisplayLink(target: self, selector: #selector(Render.gameloop))
-    self.timer.addToRunLoop(NSRunLoop.mainRunLoop(), forMode: NSDefaultRunLoopMode)
-    
-    // Add gesture recogniser
-    let gRec = UIPanGestureRecognizer(target: self, action: #selector(Render.handleOrientation))
-    gRec.delegate = self
-    self.view.addGestureRecognizer(gRec)
+  required init(coder: NSCoder) {
+    super.init(coder: coder)
   }
   
   func handleOrientation(gestureRecogniser: UIGestureRecognizer) {
-    print(gestureRecogniser.locationInView(self.view))
+    self.position = gestureRecogniser.locationInView(self.view)
   }
   
   func render() {
@@ -135,5 +144,17 @@ class Render: NSObject, UIGestureRecognizerDelegate {
   
   @objc func test_render() {
     print("got 'eeem nigga")
+  }
+}
+
+@available(iOS 9.0, *)
+extension Render: MTKViewDelegate {
+  
+  func mtkView(view: MTKView, drawableSizeWillChange size: CGSize) {
+    
+  }
+  
+  func drawInMTKView(view: MTKView) {
+    
   }
 }
